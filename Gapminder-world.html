@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang = "en" class="tas-com">
+<head>
+	<meta charset="utf-8">
+	<title>D3: Moving Line Charts</title>
+	<link href="./themes/prism.css" rel="stylesheet" />
+	<link href="./themes/tas_style.css" rel="stylesheet" />
+	<script type="text/javascript" src="./d3/d3.v4.js" charset="utf-8"></script>
+	<script src="./lib/prism.js" charset="utf-8"></script>
+	<style type="text/css">
+		.axis path,
+		.axis line {
+		    fill: none;
+		    stroke: black;
+		    shape-rendering: crispEdges;
+		}
+		
+		.axis text {
+		    font-family: sans-serif;
+		    font-size: 11px;
+		}	
+	</style>
+</head>
+<body>
+
+	<!-- <h1>Line Charts With Generators</h1> -->
+	<h2>Information Visualisation</h2>
+	<h3>Name: Ming Ma</h3>
+
+	<div class = "demo">
+	
+		<script type="text/javascript" id = "demo_code">
+
+// Define margins
+var margin = {top: 40, right: 400, bottom: 25, left: 100};
+var margin2 = {top: 50, right: 200, bottom: 25, left: 100};
+
+//Width and height
+var outer_width = 1200;
+var outer_height = 400;
+var svg_width = outer_width - margin.left - margin.right;
+var svg_height = outer_height - margin.top - margin.bottom;
+
+var outer_width2 = 1200;
+var outer_height2 = 300;
+var svg_width2 = outer_width2 - margin2.left - margin2.right;
+var svg_height2 = outer_height2 - margin2.top - margin2.bottom;
+
+//Define a date parser
+var formatDate = d3.timeParse("%y/%m/%d");
+
+// The global data set object
+var dataset;
+
+// Set up the scale to be used on the x axis
+xScale = d3.scaleLog()
+				.range([0,svg_width]);
+
+// Set up the scale to be used on the y axis
+yScale = d3.scaleLinear()
+				.range([svg_height,0]);
+
+
+x1Scale = d3.scaleLog()
+				.domain([0,1300])
+				.range([0,svg_width2]);
+
+y1Scale = d3.scaleLinear()
+				.domain([2,8])
+				.range([svg_height2,0]);
+
+rScale = d3.scaleLinear()
+				.range([8,10]);
+
+colorScale = d3.scaleOrdinal()
+				.domain(["Emerging and Developing Europe", "Middle East, North Africa, and Pakistan", "Sub-Saharan Africa", "Latin America and the Caribbean", "Commonwealth of Independent States", "Advanced economies","Emerging and Developing Asia"] )
+				.range(["Red","Green","Blue","Black","Orange","Purple","Pink"]);
+
+var widthUnit = svg_width/12;
+
+axisScale = d3.scaleOrdinal()
+				.domain(["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th","11st","12nd"])
+				.range([0,widthUnit,widthUnit*2,widthUnit*3,widthUnit*4,widthUnit*5,widthUnit*6,widthUnit*7,widthUnit*8,widthUnit*9,widthUnit*10,widthUnit*11,widthUnit*12]);
+			
+// Create an x-axis connected to the x scale
+var xAxis = d3.axisBottom()
+			  	.scale(xScale)
+			  	.ticks(10,d3.formatPrefix(".0", 1e3));
+			  	//.tickFormat(d3.formatPrefix(".1", 1e3));
+
+//Define Y axis
+var yAxis = d3.axisLeft()
+				  .scale(yScale)
+				  .ticks(10);
+
+var yAxis2 = d3.axisLeft()
+				  .scale(y1Scale);
+
+function make_x_gridlines() {
+              return d3.axisBottom(xScale)
+                  .ticks(5) 
+          }
+
+
+function make_x_gridlines2() {
+              return d3.axisBottom(axisScale)
+                  .ticks(5) 
+          }
+
+function make_y_gridlines() {
+              return d3.axisLeft(yScale)
+                  .ticks(10) 
+              }
+
+function make_y_gridlines2() {
+              return d3.axisLeft(y1Scale)
+                  .ticks(5) 
+              }
+
+							  
+var easing = [d3.easeCubicInOut, d3.easeLinear, d3.easeElastic, d3.easeBack, d3.easeBounce];
+			var easing_names = ["CubicInOut", "Linear", "Elastic", "Back", "Bounce"];
+			var easing_index = 0;
+
+//Create SVG element as a group with the margins transform applied to it
+var svg = d3.select("body")
+			.append("svg")
+			.attr("width", svg_width + margin.left + margin.right)
+			.attr("height", svg_height + margin.top + margin.bottom)
+			.attr("id","canvase")
+			.append("g")
+			.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+var buttonNames = [ "button","2007","2008","2009", "2010", "2011", "2012", "2013", "2014","2015","2016","2017","Play/Stop","Clear","Show/Hide Trails"];
+
+var svg_button = d3.select("html")
+					.attr("id","svg_button")
+					.append("svg")
+					.attr("width", margin.left)
+					.attr("height", "20")
+					.attr("id","canvase2")
+					.append("g")
+					.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+svg.append("text")
+	.text("Colors represent different regions:\n")
+	.attr("x",svg_width+20)
+	.attr("y",10)
+	.attr("font-size","18px")
+	.attr("fill","black")
+	.attr("stroke","black")
+	.attr("stroke-width","1");
+
+svg.append("text")
+	.text("Emerging and Developing Europe: Red\n")
+	.attr("x",svg_width+20)
+	.attr("y",25)
+	.attr("fill","black");
+
+svg.append("text")
+	.text("Middle East, North Africa, and Pakistan: Green\n")
+	.attr("x",svg_width+20)
+	.attr("y",40)
+	.attr("fill","black");
+
+svg.append("text")
+	.text("Sub-Saharan Africa: Blue\n")
+	.attr("x",svg_width+20)
+	.attr("y",55)
+	.attr("fill","black");
+
+svg.append("text")
+	.text("Latin America and the Caribbean: Black\n")
+	.attr("x",svg_width+20)
+	.attr("y",70)
+	.attr("fill","black");
+
+svg.append("text")
+	.text("Commonwealth of Independent States: Orange\n")
+	.attr("x",svg_width+20)
+	.attr("y",85)
+	.attr("fill","black");
+
+svg.append("text")
+	.text("Advanced economies: Purple\n")
+	.attr("x",svg_width+20)
+	.attr("y",100)
+	.attr("fill","black");
+
+svg.append("text")
+	.text("Emerging and Developing Asia: Pink\n")
+	.attr("x",svg_width+20)
+	.attr("y",115)
+	.attr("fill","black");
+
+
+d3.select("#svg_button").data(buttonNames)
+			.enter()
+			.append("input")
+			.attr("id","button")
+			.attr("type","button")
+			.attr("class","button")
+			.attr("value", function (d){return d;} );
+
+var svg2 = d3.select("html")
+					.append("svg")
+					.attr("width", (svg_width2 + margin2.left + margin2.right)*11/12)
+					.attr("height", svg_height2 + margin2.top + margin2.bottom)
+					.attr("id","canvase2")
+					.append("g")
+					.attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+svg2.append("text")
+	.text("1st: Institutions\n")
+	.attr("x",svg_width+20)
+	.attr("y",0)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("2nd: Infrastructure\n")
+	.attr("x",svg_width+20)
+	.attr("y",20)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("3rd: Macroeconomic_environment\n")
+	.attr("x",svg_width+20)
+	.attr("y",40)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("4th: Health_and_primary_education\n")
+	.attr("x",svg_width+20)
+	.attr("y",60)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("5th: Higher_education_and_training\n")
+	.attr("x",svg_width+20)
+	.attr("y",80)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("6th: Goods_market_efficiency\n")
+	.attr("x",svg_width+20)
+	.attr("y",100)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("7th: Labor_market_efficiency\n")
+	.attr("x",svg_width+20)
+	.attr("y",120)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("8th:Financial_market_development\n")
+	.attr("x",svg_width+20)
+	.attr("y",140)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("9th: Technological_readiness\n")
+	.attr("x",svg_width+20)
+	.attr("y",160)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("10th: Market_size\n")
+	.attr("x",svg_width+20)
+	.attr("y",180)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("11th: Business_sophistication\n")
+	.attr("x",svg_width+20)
+	.attr("y",200)
+	.attr("fill","black");
+
+svg2.append("text")
+	.text("12th: Innovation\n")
+	.attr("x",svg_width+20)
+	.attr("y",220)
+	.attr("fill","black");
+
+display_year = 2007;
+
+var valueline = d3.line()
+        .x(function(d) {
+            return x1Scale(d.x);
+        })
+        .y(function(d) {
+            return yScale(d.y);
+        });
+
+function yearFilter(value){
+				return (value.Year == display_year)
+			}
+
+function countryFilter(value){
+				return (value.Country == countryName)
+			}
+
+var points;
+var selected = new Array();
+var dataset;
+var countryName;
+
+var playButton = 1;
+var trailsButton = 0;
+
+
+function showTrack(){
+
+	for(var i=0;i<selected.length;i++){
+		countryName = selected[i];
+		var filtered_datset = dataset.filter(countryFilter);
+
+
+		var points = svg.selectAll("circle").data(filtered_datset, function(filtered_datset){return filtered_datset.Country})
+					.enter()
+					.insert("circle")
+					.attr("id","tracks")
+					.attr("cx", function(d){return xScale(d.GDP);})
+					.attr("cy", function(d){return yScale(d.Global_Competitiveness_Index);})
+					.attr("r", function(d){return rScale(d.Population);})
+					.attr("opacity","1")
+					.style("fill", function(d){return colorScale(d.Region);})
+					.style("stroke","black")
+					.style("stroke-width", "0.3");
+
+	}
+}
+
+function generateVis(){
+	  	var filtered_datset = dataset.filter(yearFilter);
+		
+		points = svg.selectAll("circle")
+						.data(filtered_datset, function(filtered_datset){return filtered_datset.Country});
+
+
+		if(trailsButton == 1) showTrack();
+
+		texts = svg.selectAll(".countryName")
+						.data(filtered_datset, function(filtered_datset){return filtered_datset.Country});
+
+		lines = svg2.selectAll("line")
+						.data(filtered_datset, function(filtered_datset){return filtered_datset.Country});
+
+
+						
+		
+		d3.selectAll("#year_header").text("Year: " + display_year);
+
+		d3.selectAll("#year_header2")
+			.text(display_year)
+			.attr("opacity",function(){if(selected.length > 0) return "0.3"; else return "0"});
+
+		points.enter()
+				.append("circle")
+					.transition()
+					.duration(1000)
+					.attr("class","country")
+					.attr("id",function(d){return d.Country})
+					.attr("cx", function(d){return xScale(d.GDP);})
+					.attr("cy", function(d){return yScale(d.Global_Competitiveness_Index);})
+					.attr("r", function(d){return rScale(d.Population);})
+					.attr("opacity",function(){if(selected.indexOf(this.id) != -1) return "1"; else return "0.5";})
+					.style("fill", function(d){return colorScale(d.Region);})
+					.style("stroke","black")
+					.style("stroke-width", "1");
+		
+		points
+			  		.transition()
+					.duration(1000)
+					.attr("class","country")
+					.attr("id",function(d){return d.Country})
+			  		.attr("cx",function(d){return xScale(d.GDP);})
+			  		.attr("cy",function(d){return yScale(d.Global_Competitiveness_Index);})
+			  		.attr("r",function(d){return rScale(d.Population);})
+			  		.attr("opacity",function(){if(selected.indexOf(this.id) != -1) return "1"; else return "0.5";})
+			  		.style("fill",function(d){return colorScale(d.Region);})
+			  		.style("stroke","black");
+
+
+		texts.enter()
+				.append("text")
+					.transition()
+					.duration(1000)
+					.attr("class","countryName")
+					.attr("id",function(d){return d.Country})
+					.attr("x", function(d){return xScale(d.GDP);})
+					.attr("y", function(d){return yScale(d.Global_Competitiveness_Index);})
+					.attr("opacity",function(){if(selected.indexOf(this.id) != -1) return "1"; else return "0";})
+					.text(function(d) {if(selected.indexOf(this.id) != -1) return d.Country; else return null;})
+					.style("fill","black")
+					.style("stroke","black")
+					.style("stroke-width", function(){if(selected.indexOf(this.id) != -1) return "0.5"; else return "0";})
+					.style("font-size",function(){if(selected.indexOf(this.id) != -1) return "20px"; else return "15px";});
+
+		texts
+					.transition()
+					.duration(1000)
+					.attr("class","countryName")
+					.attr("id",function(d){return d.Country})
+					.attr("x", function(d){return xScale(d.GDP);})
+					.attr("y", function(d){return yScale(d.Global_Competitiveness_Index);})
+					.attr("opacity",function(){if(selected.indexOf(this.id) != -1) return "1"; else return "0";})
+					.text(function(d) {if(selected.indexOf(this.id) != -1) return d.Country; else return null;})
+					.style("fill","black")
+					.style("stroke","black")
+					.style("stroke-width", function(){if(selected.indexOf(this.id) != -1) return "0.5"; else return "0";})
+					.style("font-size",function(){if(selected.indexOf(this.id) != -1) return "20px"; else return "15px";});
+
+
+		points
+				  .on("click",function(){
+				  	var active = this.active ? false : true;
+				  		newopacity = active? 1:0.3;
+					this.active = active;
+				  	if(selected.indexOf(this.id) == -1){
+				  			selected.push(this.id);
+				  			d3.selectAll("."+this.id).attr("opacity",newopacity);		
+				  			generateVis();
+				  	} 
+				  	else if(selected.indexOf(this.id) != -1) {
+				  			d3.selectAll("."+this.id).attr("opacity",newopacity);
+				  			selected.splice(selected.indexOf(this.id),1);
+				  			generateVis();
+				  	}
+				  	console.log(selected);
+
+		  }) ;
+
+
+		points
+				  .on("mouseover",function(){
+				  	if(selected.indexOf(this.id) == -1){
+				  			console.log("mouseover points");
+				  		 	d3.selectAll("#"+this.id).attr("opacity","1")
+				  		 	.text(this.id)
+				  			.attr("font-size","15px")
+				  			.attr("stroke-width","5");
+
+				  	}});
+
+		points
+				  .on("mouseout",function(){
+				  	if(selected.indexOf(this.id) == -1){
+
+				  		console.log("mouseout points");
+				  		d3.selectAll("#"+this.id).attr("opacity","0.3")
+				  			.text(null)
+				  			.attr("font-size","0px");
+
+					  	if(playButton == 0){
+					  		generateVis();
+				  	}
+
+				  	}});
+
+
+
+
+		texts
+				  .on("mouseover",function(){
+				  	if(selected.indexOf(this.id) == -1){
+				  		console.log("mouseover texts");
+					  	d3.selectAll("#"+this.id).attr("opacity","1")
+					  	.text(null)
+					  		.attr("font-size","15px");
+					  		
+					  	if(playButton == 0){
+					  		generateVis();
+					  	}		
+				  	}});
+
+
+		texts
+				  .on("click",function(){
+				  	var active = this.active ? false : true;
+				  		newopacity = active? 1:0.3;
+					this.active = active;
+				  	if(selected.indexOf(this.id) == -1){
+				  			selected.push(this.id);
+				  			d3.selectAll("."+this.id).attr("opacity",newopacity);
+				  			console.log(this);
+				  			generateVis();
+				  	}
+				  	else if( selected.indexOf(this.id) != -1) {
+				  			d3.selectAll("."+this.id).attr("opacity",newopacity);
+				  			selected.splice(selected.indexOf(this.id),1);
+				  			generateVis();
+				  	}
+				  	
+				  	console.log(selected);
+		  }) ;
+
+		
+		lines.enter().append("path")
+				.transition()
+				.attr("id","plot")
+				.attr("d",function(d){
+					if(selected.indexOf(d.Country) != -1){
+						pathString = "M 0 " + y1Scale(d.Institutions) +
+									" L " + widthUnit + " " + y1Scale(d.Infrastructure) + 
+									" L " + widthUnit*2 + " " + y1Scale(d.Macroeconomic_environment) +
+									" L " + widthUnit*3 + " " + y1Scale(d.Health_and_primary_education) + 
+									" L " + widthUnit*4 + " " + y1Scale(d.Higher_education_and_training) +
+									" L " + widthUnit*5 + " " + y1Scale(d.Goods_market_efficiency) +
+									" L " + widthUnit*6 + " " + y1Scale(d.Labor_market_efficiency) +
+									" L " + widthUnit*7 + " " + y1Scale(d.Financial_market_development) +
+									" L " + widthUnit*8 + " " + y1Scale(d.Technological_readiness) +
+									" L " + widthUnit*9 + " " + y1Scale(d.Market_size) +
+									" L " + widthUnit*10 + " " + y1Scale(d.Business_sophistication_) +
+									" L " + widthUnit*11 + " " + y1Scale(d.Innovation);
+						return pathString;
+					}
+				})
+				.attr("fill",function(d) {return colorScale(d.Region);})
+				.attr("stroke",function(d) {return colorScale(d.Region);})
+				.attr("stroke-width","5")
+				.attr("opacity","0.8");
+
+		svg2.selectAll("path").append("text")
+			//.transition()
+			//.duration(1000)
+			.data(filtered_datset)
+			.attr("id","label")
+			.text(function(d) {if(selected.indexOf(d.Country) != -1){ return d.Country};})
+			.attr("x",function(d){return selected.indexOf(d.Country) * widthUnit})
+			.attr("y",function(d) {return yScale(d.Infrastructure)})
+			.attr("font-size","10px")
+			.attr("fill","black");
+
+		points.exit().remove();
+		
+		//d3.selectAll("#plot").attr("d",null);
+
+		d3.selectAll("#plot").remove();
+		
+}
+
+// Load the file data.csv and generate a visualisation based on it
+	d3.csv("./data/GCI_CompleteData4.csv", function(error, data){
+		
+		// handle any data loading errors
+		if(error){
+			console.log("Something went wrong");
+			console.log(error);
+		}else{
+			console.log("Data Loaded");
+			dataset = data;
+
+			// Set the domains of the x and y scales using the data
+			var max_Com = d3.max(dataset, function(d) { return d.Global_Competitiveness_Index;} );
+				var min_Com = d3.min(dataset, function(d) { return d.Global_Competitiveness_Index;} );
+				var max_GDP = d3.max(dataset, function(d) { return d.GDP;} );
+				var min_GDP = d3.min(dataset, function(d) { return d.GDP;} );
+				var max_Population = d3.max(dataset, function(d) { return d.Population;} );
+				var min_Population = d3.min(dataset, function(d) { return d.Population;} );
+		
+				xScale.domain([500,160000]);
+				yScale.domain([2,6]);
+				rScale.domain([90841,138639500]);
+
+				console.log(min_Com);
+				console.log(max_Com);
+			
+			// Create the x-axis
+			svg.append("g")
+					.attr("class", "axis")
+					.attr("id", "x-axis")
+					.attr("transform", "translate(0," + svg_height + ")")
+					.call(xAxis)
+						.append("text")
+						.text("GDP")
+						.attr("transform","translate("+ svg_width + ",20)")
+						.attr("fill","black");
+
+			svg.append("g")
+					.attr("class", "axis")
+					.attr("id", "y-axis")
+					.call(yAxis)
+						.append("text")
+						.text("Global_Competitiveness_Index")
+						.attr("fill","black")
+						.attr("transform","rotate(-90),translate(0,-30)");
+						
+						
+			svg.append("text")
+				.text("Year: 2007")
+				.attr("id","year_header")
+				.attr("y",-10)
+				.attr("fill","black")
+				.attr("stroke","black")
+				.attr("font-size","20px")
+				.attr("stroke-width","1");
+
+			svg.append("g")
+            .attr("class", "grid")
+            .attr("transform", "translate(0," + svg_height + ")")
+            .attr("opacity","0.3")
+            .call(make_x_gridlines()
+                .tickSize(-svg_height) 
+                .tickFormat("") 
+            )
+
+	        svg.append("g")
+	            .attr("class", "grid")
+	            .attr("opacity","0.3")
+	            .call(make_y_gridlines()
+	                .tickSize(-svg_width) 
+	                .tickFormat("")  
+	            )
+
+
+	        svg2.append("g")
+            .attr("class", "grid")
+            .attr("transform", "translate(0," + svg_height2 + ")")
+            .attr("opacity","0.3")
+            .call(make_x_gridlines2()
+                .tickSize(-svg_height2) 
+                .tickFormat("") 
+            )
+
+	        svg2.append("g")
+	            .attr("class", "grid")
+	            .attr("opacity","0.3")
+	            .call(make_y_gridlines2()
+	                .tickSize(-svg_width) 
+	                .tickFormat("")  
+	            )
+
+			generateVis();
+			
+
+			var loop = setInterval(function() {
+					display_year = display_year + 1;
+						if(display_year > 2017){
+							display_year = 2007;
+						}
+
+						generateVis();
+						}, 1000);
+
+			d3.selectAll("#button")
+			.on("click",function(){
+				if(this.value != "Play" && this.value != "Clear" && this.value != "Show/Hide Trails"){
+					clearInterval(loop);
+					loop = 0;
+				}
+
+				if(this.value == "Clear"){
+					selected = [];
+					generateVis();
+				}
+
+				if(this.value == "2007"){
+					display_year = 2007;
+					generateVis();
+				}
+				else if(this.value == "2008"){
+					display_year = 2008;
+					generateVis();
+				}
+				else if(this.value == "2009"){
+					display_year = 2009;
+					generateVis();
+				}
+				else if(this.value == "2010"){
+					display_year = 2010;
+					generateVis();
+				}
+				else if(this.value == "2011"){
+					display_year = 2011;
+					generateVis();
+				}
+				else if(this.value == "2012"){
+					display_year = 2012;
+					generateVis();
+				}
+				else if(this.value == "2013"){
+					display_year = 2013;
+					generateVis();
+				}
+				else if(this.value == "2014"){
+					display_year = 2014;
+					generateVis();
+				}
+				else if(this.value == "2015"){
+					display_year = 2015;
+					generateVis();
+				}
+				else if(this.value == "2016"){
+					display_year = 2016;
+					generateVis();
+				}
+				else if(this.value == "2017"){
+					display_year = 2017;
+					generateVis();
+				}
+				else if(this.value == "Play/Stop"){
+					if(playButton == 0){
+						if(!(loop) || loop == 0){
+							loop = setInterval(function() {
+							display_year = display_year + 1;
+							if(display_year > 2017){
+								display_year = 2007;
+							}
+
+							generateVis();
+							}, 1000);
+						}
+						playButton = 1;
+					} else if (playButton == 1){
+						clearInterval(loop);
+						loop = 0;
+						playButton = 0;
+						generateVis();
+					}
+				}
+
+			});
+
+
+			d3.selectAll("#button")
+			.on("mousedown",function(){
+				if(this.value == "Show/Hide Trails"){
+					if(trailsButton == 0 ){
+						trailsButton = 1;
+					}
+					else{
+						trailsButton = 0;
+						d3.selectAll("#tracks").remove();
+					}
+					generateVis();
+				}
+			});
+
+			svg2.insert("text")
+				.attr("x",0)
+				.attr("y", -10)
+				.text("The below chart shows individual pillars of selected country:")
+				.attr("fill","black")
+				.attr("stroke","black")
+				.attr("font-size","20px")
+				.attr("stroke-width","0.5");
+
+			svg2.append("text")
+				.text(display_year)
+				.attr("id","year_header2")
+				.attr("x",300)
+				.attr("y",50)
+				.attr("opacity",function(){if(selected.length > 0) return "0.3"; else return "0"})
+				.attr("font-size","50px")
+				.attr("fill","black")
+				.attr("stroke","black")
+				.attr("stroke-width","1");
+
+			var xAxis2 = d3.axisBottom()
+			  	.scale(axisScale)
+			  	.ticks(12);
+
+			svg2.append("g")
+				.call(yAxis2);
+			svg2.append("g")
+					.attr("transform", "translate(0," + svg_height2 + ")")
+					.call(xAxis2);
+
+
+			
+		}
+	});
+		</script>
+		</div>
+
+		<!-- <h2>Full Code Listing</h2>
+		<pre class = "line-numbers"><code class="language-javascript" id = "full_code_list"></code></pre>
+		<script type="text/javascript">d3.select("#full_code_list").text(d3.select("#demo_code").text())</script> -->
+	</div>
+</body>	 
+</html>
